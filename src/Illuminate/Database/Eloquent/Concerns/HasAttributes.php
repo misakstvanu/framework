@@ -723,7 +723,22 @@ trait HasAttributes
     }
 
     /**
-     * Ensures that the given casts are strings.
+     * Merge new casts with existing casts on the model.
+     *
+     * @param  array  $casts
+     * @return $this
+     */
+    public function mergeCasts($casts)
+    {
+        $casts = $this->ensureCastsAreStringValues($casts);
+
+        $this->casts = array_merge($this->casts, $casts);
+
+        return $this;
+    }
+
+    /**
+     * Ensure that the given casts are strings.
      *
      * @param  array  $casts
      * @return array
@@ -746,31 +761,6 @@ trait HasAttributes
         }
 
         return $casts;
-    }
-
-    /**
-     * The attributes that should be cast.
-     *
-     * @return array
-     */
-    protected function casts()
-    {
-        return [];
-    }
-
-    /**
-     * Merge new casts with existing casts on the model.
-     *
-     * @param  array  $casts
-     * @return $this
-     */
-    public function mergeCasts($casts)
-    {
-        $casts = $this->ensureCastsAreStringValues($casts);
-
-        $this->casts = array_merge($this->casts, $casts);
-
-        return $this;
     }
 
     /**
@@ -1559,7 +1549,7 @@ trait HasAttributes
     }
 
     /**
-     * Get the casts array.
+     * Get teh attributes that should be cast.
      *
      * @return array
      */
@@ -1570,6 +1560,16 @@ trait HasAttributes
         }
 
         return $this->casts;
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array
+     */
+    protected function casts()
+    {
+        return [];
     }
 
     /**
