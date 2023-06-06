@@ -469,10 +469,6 @@ class Kernel implements KernelContract
      */
     protected function discoverCommands()
     {
-        if (! in_array($defaultCommandPath = $this->defaultCommandPath(), $this->loadedPaths)) {
-            $this->load($defaultCommandPath);
-        }
-
         foreach ($this->commandPaths as $path) {
             $this->load($path);
         }
@@ -496,16 +492,6 @@ class Kernel implements KernelContract
                 return $bootstrapper === \Illuminate\Foundation\Bootstrap\BootProviders::class;
             })->all()
         );
-    }
-
-    /**
-     * Get the default command path for the kernel.
-     *
-     * @return string
-     */
-    protected function defaultCommandPath()
-    {
-        return $this->app->path('Console');
     }
 
     /**
