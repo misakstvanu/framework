@@ -19,16 +19,16 @@ use InvalidArgumentException;
 use IteratorAggregate;
 use JsonSerializable;
 use Mockery as m;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use stdClass;
 use Symfony\Component\VarDumper\VarDumper;
 use Traversable;
 use UnexpectedValueException;
+use WeakMap;
 
-if (PHP_VERSION_ID >= 80100) {
-    include_once 'Enums.php';
-}
+include_once 'Enums.php';
 
 class SupportCollectionTest extends TestCase
 {
@@ -793,6 +793,21 @@ class SupportCollectionTest extends TestCase
 
         $c = new Collection(['name' => 'taylor', 'foo' => 'bar', 'baz' => 'qux']);
         $c = $c->forget(['foo', 'baz'])->all();
+        $this->assertFalse(isset($c['foo']));
+        $this->assertFalse(isset($c['baz']));
+        $this->assertTrue(isset($c['name']));
+    }
+
+    public function testForgetCollectionOfKeys()
+    {
+        $c = new Collection(['foo', 'bar', 'baz']);
+        $c = $c->forget(collect([0, 2]))->all();
+        $this->assertFalse(isset($c[0]));
+        $this->assertFalse(isset($c[2]));
+        $this->assertTrue(isset($c[1]));
+
+        $c = new Collection(['name' => 'taylor', 'foo' => 'bar', 'baz' => 'qux']);
+        $c = $c->forget(collect(['foo', 'baz']))->all();
         $this->assertFalse(isset($c['foo']));
         $this->assertFalse(isset($c['baz']));
         $this->assertTrue(isset($c['name']));
@@ -2249,12 +2264,14 @@ class SupportCollectionTest extends TestCase
     {
         $data = new $collection(['first' => 'Taylor', 'last' => 'Otwell', 'email' => 'taylorotwell@gmail.com']);
 
+        $this->assertEquals($data->all(), $data->except(null)->all());
         $this->assertEquals(['first' => 'Taylor'], $data->except(['last', 'email', 'missing'])->all());
         $this->assertEquals(['first' => 'Taylor'], $data->except('last', 'email', 'missing')->all());
-
         $this->assertEquals(['first' => 'Taylor'], $data->except(collect(['last', 'email', 'missing']))->all());
+
         $this->assertEquals(['first' => 'Taylor', 'email' => 'taylorotwell@gmail.com'], $data->except(['last'])->all());
         $this->assertEquals(['first' => 'Taylor', 'email' => 'taylorotwell@gmail.com'], $data->except('last')->all());
+        $this->assertEquals(['first' => 'Taylor', 'email' => 'taylorotwell@gmail.com'], $data->except(collect(['last']))->all());
     }
 
     /**
@@ -2318,7 +2335,7 @@ class SupportCollectionTest extends TestCase
      */
     public function testPluckDuplicateKeysExist($collection)
     {
-        $data = new collection([
+        $data = new $collection([
             ['brand' => 'Tesla', 'color' => 'red'],
             ['brand' => 'Pagani', 'color' => 'white'],
             ['brand' => 'Tesla', 'color' => 'black'],
@@ -2942,6 +2959,19 @@ class SupportCollectionTest extends TestCase
         $this->assertEquals(['foo' => 'bar'], $data->all());
     }
 
+    #[DataProvider('collectionClassProvider')]
+    public function testConstructMethodFromWeakMap($collection)
+    {
+        $this->expectException('InvalidArgumentException');
+
+        $map = new WeakMap();
+        $object = new stdClass;
+        $object->foo = 'bar';
+        $map[$object] = 3;
+
+        $data = new $collection($map);
+    }
+
     public function testSplice()
     {
         $data = new Collection(['foo', 'baz']);
@@ -3327,6 +3357,20 @@ class SupportCollectionTest extends TestCase
     public function sortByUrl(array $value)
     {
         return $value['url'];
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testGroupByAttributeWithBackedEnumKey($collection)
+    {
+        $data = new $collection([
+            ['rating' => TestBackedEnum::A, 'url' => '1'],
+            ['rating' => TestBackedEnum::B, 'url' => '1'],
+        ]);
+
+        $result = $data->groupBy('rating');
+        $this->assertEquals([TestBackedEnum::A->value => [['rating' => TestBackedEnum::A, 'url' => '1']], TestBackedEnum::B->value => [['rating' => TestBackedEnum::B, 'url' => '1']]], $result->toArray());
     }
 
     /**
@@ -4187,6 +4231,37 @@ class SupportCollectionTest extends TestCase
     /**
      * @dataProvider collectionClassProvider
      */
+    public function testSelect($collection)
+    {
+        $data = new $collection([
+            ['first' => 'Taylor', 'last' => 'Otwell', 'email' => 'taylorotwell@gmail.com'],
+            ['first' => 'Jess', 'last' => 'Archer', 'email' => 'jessarcher@gmail.com'],
+        ]);
+
+        $this->assertEquals($data->all(), $data->select(null)->all());
+        $this->assertEquals([['first' => 'Taylor'], ['first' => 'Jess']], $data->select(['first', 'missing'])->all());
+        $this->assertEquals([['first' => 'Taylor'], ['first' => 'Jess']], $data->select('first', 'missing')->all());
+        $this->assertEquals([['first' => 'Taylor'], ['first' => 'Jess']], $data->select(collect(['first', 'missing']))->all());
+
+        $this->assertEquals([
+            ['first' => 'Taylor', 'email' => 'taylorotwell@gmail.com'],
+            ['first' => 'Jess', 'email' => 'jessarcher@gmail.com'],
+        ], $data->select(['first', 'email'])->all());
+
+        $this->assertEquals([
+            ['first' => 'Taylor', 'email' => 'taylorotwell@gmail.com'],
+            ['first' => 'Jess', 'email' => 'jessarcher@gmail.com'],
+        ], $data->select('first', 'email')->all());
+
+        $this->assertEquals([
+            ['first' => 'Taylor', 'email' => 'taylorotwell@gmail.com'],
+            ['first' => 'Jess', 'email' => 'jessarcher@gmail.com'],
+        ], $data->select(collect(['first', 'email']))->all());
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
     public function testGettingAvgItemsFromCollection($collection)
     {
         $c = new $collection([(object) ['foo' => 10], (object) ['foo' => 20]]);
@@ -4710,7 +4785,7 @@ class SupportCollectionTest extends TestCase
     /**
      * @dataProvider collectionClassProvider
      */
-    public function testSplitCollectionWithADivisableCount($collection)
+    public function testSplitCollectionWithADivisibleCount($collection)
     {
         $data = new $collection(['a', 'b', 'c', 'd']);
         $split = $data->split(2);
@@ -5562,6 +5637,114 @@ class SupportCollectionTest extends TestCase
             'foo.1' => 'baz',
             'foo.baz' => 'boom',
         ], $data->all());
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testEnsureForScalar($collection)
+    {
+        $data = $collection::make([1, 2, 3]);
+        $data->ensure('int');
+
+        $data = $collection::make([1, 2, 3, 'foo']);
+        $this->expectException(UnexpectedValueException::class);
+        $data->ensure('int');
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testEnsureForObjects($collection)
+    {
+        $data = $collection::make([new stdClass, new stdClass, new stdClass]);
+        $data->ensure(stdClass::class);
+
+        $data = $collection::make([new stdClass, new stdClass, new stdClass, $collection]);
+        $this->expectException(UnexpectedValueException::class);
+        $data->ensure(stdClass::class);
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testEnsureForInheritance($collection)
+    {
+        $data = $collection::make([new \Error, new \Error]);
+        $data->ensure(\Throwable::class);
+
+        $data = $collection::make([new \Error, new \Error, new $collection]);
+        $this->expectException(UnexpectedValueException::class);
+        $data->ensure(\Throwable::class);
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testEnsureForMultipleTypes($collection)
+    {
+        $data = $collection::make([new \Error, 123]);
+        $data->ensure([\Throwable::class, 'int']);
+
+        $data = $collection::make([new \Error, new \Error, new $collection]);
+        $this->expectException(UnexpectedValueException::class);
+        $data->ensure([\Throwable::class, 'int']);
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testPercentageWithFlatCollection($collection)
+    {
+        $collection = new $collection([1, 1, 2, 2, 2, 3]);
+
+        $this->assertSame(33.33, $collection->percentage(fn ($value) => $value === 1));
+        $this->assertSame(50.00, $collection->percentage(fn ($value) => $value === 2));
+        $this->assertSame(16.67, $collection->percentage(fn ($value) => $value === 3));
+        $this->assertSame(0.0, $collection->percentage(fn ($value) => $value === 5));
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testPercentageWithNestedCollection($collection)
+    {
+        $collection = new $collection([
+            ['name' => 'Taylor', 'foo' => 'foo'],
+            ['name' => 'Nuno', 'foo' => 'bar'],
+            ['name' => 'Dries', 'foo' => 'bar'],
+            ['name' => 'Jess', 'foo' => 'baz'],
+        ]);
+
+        $this->assertSame(25.00, $collection->percentage(fn ($value) => $value['foo'] === 'foo'));
+        $this->assertSame(50.00, $collection->percentage(fn ($value) => $value['foo'] === 'bar'));
+        $this->assertSame(25.00, $collection->percentage(fn ($value) => $value['foo'] === 'baz'));
+        $this->assertSame(0.0, $collection->percentage(fn ($value) => $value['foo'] === 'test'));
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testHighOrderPercentage($collection)
+    {
+        $collection = new $collection([
+            ['name' => 'Taylor', 'active' => true],
+            ['name' => 'Nuno', 'active' => true],
+            ['name' => 'Dries', 'active' => false],
+            ['name' => 'Jess', 'active' => true],
+        ]);
+
+        $this->assertSame(75.00, $collection->percentage->active);
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testPercentageReturnsNullForEmptyCollections($collection)
+    {
+        $collection = new $collection([]);
+
+        $this->assertNull($collection->percentage(fn ($value) => $value === 1));
     }
 
     /**

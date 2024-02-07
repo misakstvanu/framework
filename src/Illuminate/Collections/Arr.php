@@ -195,6 +195,8 @@ class Arr
             foreach ($array as $item) {
                 return $item;
             }
+
+            return value($default);
         }
 
         foreach ($array as $key => $value) {
@@ -474,9 +476,7 @@ class Arr
      */
     public static function prependKeysWith($array, $prependWith)
     {
-        return Collection::make($array)->mapWithKeys(function ($item, $key) use ($prependWith) {
-            return [$prependWith.$key => $item];
-        })->all();
+        return static::mapWithKeys($array, fn ($item, $key) => [$prependWith.$key => $item]);
     }
 
     /**
@@ -489,6 +489,20 @@ class Arr
     public static function only($array, $keys)
     {
         return array_intersect_key($array, array_flip((array) $keys));
+    }
+
+    /**
+     * Select an array of values from an array.
+     *
+     * @param  array  $array
+     * @param  array|string  $keys
+     * @return array
+     */
+    public static function select($array, $keys)
+    {
+        return static::map($array, function ($item) use ($keys) {
+            return array_intersect_key($item, array_flip((array) $keys));
+        });
     }
 
     /**
@@ -806,9 +820,9 @@ class Arr
      * @param  int  $options
      * @return array
      */
-    public function sortRecursiveDesc($array, $options = SORT_REGULAR)
+    public static function sortRecursiveDesc($array, $options = SORT_REGULAR)
     {
-        return $this->sortRecursive($array, $options, true);
+        return static::sortRecursive($array, $options, true);
     }
 
     /**
